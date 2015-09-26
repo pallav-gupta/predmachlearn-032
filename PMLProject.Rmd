@@ -1,0 +1,96 @@
+---
+title: "Human Activity Recognition Project"
+author: "Pallav Gupta"
+date: "Saturday, September 26, 2015"
+output: html_document
+---
+## Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, we will used data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Loading the data
+
+We first loaded the training data from below location: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+And the test data from here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+```{r,cache=TRUE,results='hide'}
+library(caret)
+library(randomForest)
+library(rpart)
+
+training <- read.csv("pml-training.csv",header = TRUE,sep = ",")
+testing <- read.csv("pml-testing.csv",header = TRUE,sep = ",")
+
+```
+
+Training data includes 19622 observations and testing data has 20 observations. 
+
+## Cleaning up the Data
+
+Data has total 160 variables. There are many variables with NA values; we will replace NA with zero.
+
+
+```{r,cache=TRUE,echo=FALSE}
+training[is.na(training)] <- 0
+testing[is.na(testing)] <- 0
+
+```
+
+We will now remove the variables that have very few unique values relative to the number of samples and the ratio of the frequency of the most common value to the frequency of the second most common value is large.
+
+We can use nearZeroVar function of caret package to do this.
+
+```{r,cache=TRUE}
+nzv <- nearZeroVar(training)
+training <- training[-nzv]
+testing <- testing[-nzv]
+dim(training)
+dim(testing)
+```
+
+Data set is now reduced to 59 variables out of which first 5 includes row id, user name, part of timestamp and new_window indicator. We will remove these six variables as they don't seem to have any relevance to quality of workout.
+
+```{r,cache=TRUE}
+training <- training[,-c(1:6)]
+testing <- testing[,-c(1:6)]
+```
+
+## Analysis
+
+We first divided the training dataset in 80/20 ratio for cross validation and then fit the random forest model to new training set.
+We used the fitted model to predict classes of test set.
+```{r,cache=TRUE}
+set.seed(100)
+
+inTrain = createDataPartition(training$classe, p = .80,list = FALSE)
+trainingCV = training[ inTrain,]
+testingCV = training[-inTrain,]
+fit1 <- randomForest(classe ~ ., trainingCV)
+train_predCV <- predict(fit1,trainingCV)
+test_predCV <- predict(fit1,testingCV)
+```
+## In Sample and Out or Sample error 
+
+```{r,cache=TRUE}
+confusionMatrix(train_predCV, trainingCV$classe)[2]
+confusionMatrix(train_predCV, trainingCV$classe)[[3]][1]
+```
+
+As it's clear from confusion matrix model has 100 % accuracy in training set hence in sample error rate of '0'. This could be due to over fitting.
+
+let's check the 'out of sample' error by examining predictions for test set used for cross validation.
+
+```{r,cache=TRUE}
+confusionMatrix(test_predCV, testingCV$classe)[2]
+confusionMatrix(test_predCV, testingCV$classe)[[3]][1]
+```
+
+Model has more then 99.5 % accuracy in Test set used for cross validation hence out of sample error rate of less then 0.5 %. We should expect very low error in predicting new dataset.
+
+## Conclusion 
+
+Fitting the Random forest algorithm to the data yielded to a very good result. When we used this model to predict the real test set we could identify classes accurately. Hence, this model can be used to identify quality of exercise very accurately.  
